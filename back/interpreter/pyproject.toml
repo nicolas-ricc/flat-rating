@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "interpreter"
+version = "0.1.0"
+description = ""
+authors = ["nicolas-ricc <nicolas.riccomini@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.12,<3.14"
+pandas = "^2.3.1"
+numpy = "^2.3.2"
+datasets = "^4.0.0"
+bitsandbytes = "^0.47.0"
+trl = "^0.21.0"
+requests = "^2.32.4"
+transformers = "^4.55.0"
+peft = "^0.17.0"
+accelerate = "^1.10.0"
+huggingface-hub = "^0.34.4"
+safetensors = "^0.6.2"
+matplotlib = "^3.10.5"
+torch = "^2.8.0"
+jupyter = "^1.1.1"
+
+
+[tool.poetry.group.dev.dependencies]
+notebook = "^7.4.5"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
