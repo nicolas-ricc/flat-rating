@@ -1,44 +1,19 @@
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Star, MapPin, Plus } from "lucide-react"
+import { MapPin, Plus, Building2 } from "lucide-react"
+import { getBuildings, type Building } from "./actions/buildings"
+import { SearchForm } from "./search-form"
 
-// Mock data - in real app this would come from your backend
-const apartments = [
-  {
-    id: 1,
-    name: "Sunset Towers",
-    address: "123 Main St, Downtown",
-    overallRating: 4.2,
-    totalReviews: 28,
-    image: "/placeholder.svg?height=200&width=300",
-    priceRange: "$1,200 - $2,800",
-    topAmenities: ["Pool", "Gym", "Parking"],
-  },
-  {
-    id: 2,
-    name: "Garden View Apartments",
-    address: "456 Oak Ave, Midtown",
-    overallRating: 3.8,
-    totalReviews: 15,
-    image: "/placeholder.svg?height=200&width=300",
-    priceRange: "$900 - $2,100",
-    topAmenities: ["Garden", "Laundry", "Pet-Friendly"],
-  },
-  {
-    id: 3,
-    name: "Metro Heights",
-    address: "789 Broadway, Financial District",
-    overallRating: 4.6,
-    totalReviews: 42,
-    image: "/placeholder.svg?height=200&width=300",
-    priceRange: "$1,800 - $4,200",
-    topAmenities: ["Concierge", "Rooftop", "Gym"],
-  },
-]
+interface HomePageProps {
+  searchParams: Promise<{ search?: string }>
+}
 
-export default function HomePage() {
+export default async function HomePage({ searchParams }: HomePageProps) {
+  const params = await searchParams
+  const search = params.search || ""
+  const result = await getBuildings(search)
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
@@ -58,52 +33,70 @@ export default function HomePage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Apartment Buildings in Your City</h2>
-          <p className="text-gray-600">Discover and rate apartment buildings based on real resident feedback</p>
+          <p className="text-gray-600 mb-4">Discover and rate apartment buildings based on real resident feedback</p>
+          <SearchForm initialSearch={search} />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {apartments.map((apartment) => (
-            <Card key={apartment.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader className="p-0">
-                <img
-                  src={apartment.image || "/placeholder.svg"}
-                  alt={apartment.name}
-                  className="w-full h-48 object-cover rounded-t-lg"
-                />
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="flex justify-between items-start mb-2">
-                  <CardTitle className="text-lg">{apartment.name}</CardTitle>
-                  <div className="flex items-center gap-1">
-                    <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                    <span className="font-semibold">{apartment.overallRating}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center text-gray-600 mb-2">
-                  <MapPin className="w-4 h-4 mr-1" />
-                  <span className="text-sm">{apartment.address}</span>
-                </div>
-
-                <p className="text-sm text-gray-600 mb-3">{apartment.priceRange}</p>
-                <p className="text-xs text-gray-500 mb-4">{apartment.totalReviews} reviews</p>
-
-                <div className="flex flex-wrap gap-1 mb-4">
-                  {apartment.topAmenities.map((amenity) => (
-                    <Badge key={amenity} variant="secondary" className="text-xs">
-                      {amenity}
-                    </Badge>
-                  ))}
-                </div>
-
-                <Link href={`/apartment/${apartment.id}`}>
-                  <Button className="w-full">View Details</Button>
-                </Link>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {!result.success ? (
+          <div className="text-center py-12">
+            <p className="text-red-600">{result.error}</p>
+            <p className="text-gray-500 mt-2">Please make sure the backend server is running.</p>
+          </div>
+        ) : result.data.length === 0 ? (
+          <div className="text-center py-12">
+            <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500">
+              {search ? `No buildings found for "${search}"` : "No buildings yet. Be the first to add one!"}
+            </p>
+            <Link href="/add-apartment">
+              <Button className="mt-4">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Building
+              </Button>
+            </Link>
+          </div>
+        ) : (
+          <BuildingGrid buildings={result.data} />
+        )}
       </main>
+    </div>
+  )
+}
+
+function BuildingGrid({ buildings }: { buildings: Building[] }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {buildings.map((building) => (
+        <Card key={building.id} className="hover:shadow-lg transition-shadow">
+          <CardHeader className="p-0">
+            <div className="w-full h-48 bg-gradient-to-br from-blue-100 to-blue-200 rounded-t-lg flex items-center justify-center">
+              <Building2 className="w-16 h-16 text-blue-400" />
+            </div>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start mb-2">
+              <CardTitle className="text-lg">{building.name}</CardTitle>
+            </div>
+
+            <div className="flex items-center text-gray-600 mb-2">
+              <MapPin className="w-4 h-4 mr-1" />
+              <span className="text-sm">{building.address}</span>
+            </div>
+
+            {building.priceRange && (
+              <p className="text-sm text-gray-600 mb-3">{building.priceRange}</p>
+            )}
+
+            {building.description && (
+              <p className="text-sm text-gray-500 mb-4 line-clamp-2">{building.description}</p>
+            )}
+
+            <Link href={`/apartment/${building.id}`}>
+              <Button className="w-full">View Details</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   )
 }

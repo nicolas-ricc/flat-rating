@@ -16,5 +16,47 @@ services:
       timeout: 5s
       retries: 5
 
+  backend:
+    build:
+      context: ./back/rating-crud
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgres://flatrating:flatrating_dev@postgres:5432/flatrating
+      INTERPRETER_URL: http://interpreter:8001
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  interpreter:
+    build:
+      context: ./back/interpreter
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      PORT: 8001
+      BACK_API_URL: http://backend:3001
+      MODEL_NAME: microsoft/Phi-3-mini-4k-instruct
+    depends_on:
+      - backend
+    restart: unless-stopped
+    # Note: First startup will be slow as it downloads the model (~2.5GB)
+
+  frontend:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      BACK_API_URL: http://backend:3001
+    depends_on:
+      - backend
+    restart: unless-stopped
+
 volumes:
   postgres_data:

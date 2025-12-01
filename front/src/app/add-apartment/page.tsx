@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,9 +10,12 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { ArrowLeft, Star, MapPin } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { createBuilding } from "@/app/actions/buildings"
+import { createComment } from "@/app/actions/comments"
 
 export default function AddApartmentPage() {
   const router = useRouter()
+  const [isPending, startTransition] = useTransition()
   const [formData, setFormData] = useState({
     name: "",
     address: "",
@@ -22,7 +24,7 @@ export default function AddApartmentPage() {
     feedback: "",
   })
   const [rating, setRating] = useState(5)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -34,22 +36,52 @@ export default function AddApartmentPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsSubmitting(true)
+    setError(null)
 
-    // In real app, this would submit to your backend
-    console.log("Submitting new apartment:", {
-      ...formData,
-      rating,
-      submittedAt: new Date().toISOString(),
+    // Validate required fields
+    if (!formData.name.trim()) {
+      setError("Building name is required")
+      return
+    }
+    if (!formData.address.trim()) {
+      setError("Address is required")
+      return
+    }
+    if (!formData.feedback.trim()) {
+      setError("Feedback is required")
+      return
+    }
+
+    startTransition(async () => {
+      // Step 1: Create the building
+      const buildingResult = await createBuilding({
+        name: formData.name.trim(),
+        address: formData.address.trim(),
+        priceRange: formData.priceRange.trim() || undefined,
+        description: formData.description.trim() || undefined,
+      })
+
+      if (!buildingResult.success) {
+        setError(buildingResult.error)
+        return
+      }
+
+      const building = buildingResult.data
+
+      // Step 2: Create the first comment
+      const commentResult = await createComment(building.id, {
+        rating,
+        content: formData.feedback.trim(),
+      })
+
+      if (!commentResult.success) {
+        // Building was created but comment failed - still redirect to building page
+        console.error("Failed to create comment:", commentResult.error)
+      }
+
+      // Redirect to the new building's page
+      router.push(`/apartment/${building.id}`)
     })
-
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    setIsSubmitting(false)
-
-    // Redirect to home page or show success message
-    router.push("/")
   }
 
   return (
@@ -85,6 +117,7 @@ export default function AddApartmentPage() {
                     value={formData.name}
                     onChange={handleInputChange}
                     placeholder="e.g., Sunset Towers"
+                    disabled={isPending}
                     required
                   />
                 </div>
@@ -97,6 +130,7 @@ export default function AddApartmentPage() {
                     value={formData.priceRange}
                     onChange={handleInputChange}
                     placeholder="e.g., $1,200 - $2,800"
+                    disabled={isPending}
                   />
                 </div>
               </div>
@@ -112,6 +146,7 @@ export default function AddApartmentPage() {
                     onChange={handleInputChange}
                     placeholder="123 Main St, Downtown, City, State, ZIP"
                     className="pl-10"
+                    disabled={isPending}
                     required
                   />
                 </div>
@@ -126,6 +161,7 @@ export default function AddApartmentPage() {
                   onChange={handleInputChange}
                   placeholder="Describe the building, its features, and what makes it unique..."
                   rows={3}
+                  disabled={isPending}
                 />
               </div>
 
@@ -142,6 +178,7 @@ export default function AddApartmentPage() {
                         type="button"
                         onClick={() => setRating(star)}
                         className="focus:outline-none hover:scale-110 transition-transform"
+                        disabled={isPending}
                       >
                         <Star
                           className={`w-8 h-8 ${star <= rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}`}
@@ -161,21 +198,35 @@ export default function AddApartmentPage() {
                     onChange={handleInputChange}
                     placeholder="Share your experience living here. Mention amenities, management, maintenance, neighborhood, etc. This will help our AI analyze and rate specific aspects of the building."
                     rows={5}
+                    disabled={isPending}
                     required
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Your feedback will be analyzed by AI to automatically generate ratings for amenities and features.
+                    Your feedback will be analyzed by AI to automatically generate a summary of the building.
                   </p>
                 </div>
               </div>
 
+              {/* Error Message */}
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                  <p className="text-sm text-red-600">{error}</p>
+                </div>
+              )}
+
               {/* Submit Button */}
               <div className="flex gap-4 pt-6">
-                <Button type="button" variant="outline" onClick={() => router.push("/")} className="flex-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => router.push("/")}
+                  className="flex-1"
+                  disabled={isPending}
+                >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isSubmitting} className="flex-1">
-                  {isSubmitting ? "Adding Building..." : "Add Building"}
+                <Button type="submit" disabled={isPending} className="flex-1">
+                  {isPending ? "Adding Building..." : "Add Building"}
                 </Button>
               </div>
             </form>
@@ -187,8 +238,8 @@ export default function AddApartmentPage() {
           <CardContent className="p-4">
             <h4 className="font-semibold text-sm mb-2">How it works:</h4>
             <ul className="text-sm text-gray-600 space-y-1">
-              <li>• Your feedback is analyzed by AI to identify and rate specific amenities</li>
-              <li>• Amenity ratings are automatically updated as more reviews are added</li>
+              <li>• Your feedback is analyzed by AI to generate a building summary</li>
+              <li>• Summaries are automatically updated as more reviews are added</li>
               <li>• Help future residents make informed decisions</li>
             </ul>
           </CardContent>
